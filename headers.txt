@@ -12,7 +12,6 @@ Forwarded-Proto
 From
 TE
 True-Client-IP
-Upgrade
 User-Agent
 Via
 Warning

