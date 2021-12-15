@@ -1,0 +1,16 @@
+api.rezserver.com: 
+1. Don't use automated tools or scanners / Don't DDOS.
+2. Endpoints out of scope = 
+Hotel:BookRequest
+Air: All endpoints, 
+Car: All endpoints, 
+Custom: All endpoints
+
+admin.rezserver.com
+Not providing credentials at this time. 
+In request headers use 'hackerone-{your username}' for user-agent
+Keep low volume of requests - Automated testing is not permitted
+Do not fuzz the following:
+Contact forms, Request Account Activation, Request Product Activation, Change Request under Sites
+Do not modify other hacker_* user accounts under Hacker one test account (likely not relevant due 
+to them not providing credentials at this time). 
