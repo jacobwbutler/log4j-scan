@@ -1,0 +1,10 @@
+https://pro.coinbase.com
+https://api.custody.coinbase.com
+https://paradex.io
+https://prime.coinbase.com
+https://custody.coinbase.com
+https://institutional.coinbase.com
+https://cbhq.net
+https://api.coinbase.com
+https://commerce.coinbase.com
+https://coinbase.com
